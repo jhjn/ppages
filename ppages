@@ -1,0 +1,86 @@
+#!/bin/bash
+#
+# Requires: pp, cmark (rsync for deploy)
+
+CONFIG="config"
+SRV_LOC="jenneuk:/srv/jenne.uk/www/"
+TMPL_EXT=".template.html"
+
+get_from_cfg () {
+    sed -nr "s/^$1 *= *(.*) */\1/p" $CONFIG
+}
+
+deploy () {
+    # deploy all files (following filter) to server http dir.
+    # -a archive, -v verbose, -c checksum
+    rsync -avc ./ "$SRV_LOC"  \
+        --filter '- .git'     \
+        --filter '- *.sh'     \
+        --filter '- *.t.html' \
+        --filter '- *.p.md' \
+        --filter '- *.awk'    \
+        --filter '- *.swp'    \
+        --delete
+}
+
+build () {
+    export PPAGES_AUTHOR="$(get_from_cfg author)"
+    export PPAGES_TITLE="$(get_from_cfg title)"
+
+    for template in $(find . -type f -name "*$TMPL_EXT"); do
+        page_type=".${template%%$TMPL_EXT}.md" # p.template.html -> foo.p.md
+        for page in $(find . -type f -name "*$page_type"); do
+            INCLUDE_FILE=$page pp $template > ${page%%$page_type}.html
+        done
+    done
+}
+
+init () {
+    cat > config << EOF
+[example.com]
+author = Anon.
+title = My website
+EOF
+    cat > p.template.html << EOF
+<!DOCTYPE html>
+<html lang=en>
+<head>
+    <title>!{echo \$PPAGES_TITLE}!</title>
+    <meta charset=utf-8>
+    <meta content="{echo \$PPAGES_AUTHOR}" name=author>
+    <meta name="viewport" content="width=device-width,initial-scale=1">
+    <link rel="shortcut icon" href="/favicon.svg"/>
+    <link rel="stylesheet" type="text/css" href="/style.css">
+</head>
+<body>
+    <div class="pad2y" style=position:relative>
+        <div class="header-wrap header nu limiter">
+            <h1 style="line-height:1.6;font-size:1rem;margin:0 0 0.25em 0;">
+            <a href="/" style="">!{echo \$PPAGES_TITLE}!</a>
+            </h1>
+            <nav>
+                <label class= "label" for="checkbox">Menu ▼</label>
+                <input id="checkbox" type="checkbox" />
+!! cmark nav.t.md
+            </nav>
+        </div>
+
+        <div class="pad2y limiter content">
+!! cat \$INCLUDE_FILE | pp | cmark --unsafe
+        </div>
+    </div>
+</body>
+</html>
+EOF
+    cat > index.p.md << EOF
+# Homepage
+Welcome to my site!
+EOF
+}
+
+
+case $1 in
+    init) init;;
+    deploy) build && deploy;;
+    build) build;;
+esac
