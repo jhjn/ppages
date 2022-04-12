@@ -3,17 +3,26 @@
 # Requires: pp, cmark (rsync for deploy)
 
 CONFIG="config"
-SRV_LOC="jenneuk:/srv/jenne.uk/www/"
 TMPL_EXT=".template.html"
+
+die () {
+    echo "Error: $1" >&2
+    exit 1
+}
+
+usage () {
+    echo "usage"
+}
 
 get_from_cfg () {
     sed -nr "s/^$1 *= *(.*) */\1/p" $CONFIG
 }
 
 deploy () {
+    REMOTE_DEPLOY_LOCATION="$(get_from_cfg remote)"
     # deploy all files (following filter) to server http dir.
     # -a archive, -v verbose, -c checksum
-    rsync -avc ./ "$SRV_LOC"  \
+    rsync -avc ./ "$REMOTE_DEPLOY_LOCATION"  \
         --filter '- .git'     \
         --filter '- *.sh'     \
         --filter '- *.t.html' \
@@ -27,9 +36,10 @@ build () {
     export PPAGES_AUTHOR="$(get_from_cfg author)"
     export PPAGES_TITLE="$(get_from_cfg title)"
 
-    for template in $(find . -type f -name "*$TMPL_EXT"); do
+    for template in $(fd . -e "$TMPL_EXT" -x echo {/}); do
         page_type=".${template%%$TMPL_EXT}.md" # p.template.html -> foo.p.md
         for page in $(find . -type f -name "*$page_type"); do
+            echo "Building ${page%%$page_type}..."
             INCLUDE_FILE=$page pp $template > ${page%%$page_type}.html
         done
     done
@@ -40,6 +50,19 @@ init () {
 [example.com]
 author = Anon.
 title = My website
+remote = hostname:/var/www
+EOF
+    cat > style.css << EOF
+body{
+	margin: 40px auto;
+	max-width: 650px;
+	color: #222;
+	padding: 0 10px;
+	background: #f1e7da;
+}
+h1,h2,h3{font-family: sans-serif;}
+img{max-width:100%;}
+pre{overflow:auto;}
 EOF
     cat > p.template.html << EOF
 <!DOCTYPE html>
@@ -61,7 +84,7 @@ EOF
             <nav>
                 <label class= "label" for="checkbox">Menu ▼</label>
                 <input id="checkbox" type="checkbox" />
-!! cmark nav.t.md
+!! [ ! -f nav.t.md ] || cmark nav.t.md
             </nav>
         </div>
 
@@ -79,8 +102,10 @@ EOF
 }
 
 
+[ $# -gt 1 ] && die "No arguments are taken. See 'ppages help'."
 case $1 in
     init) init;;
     deploy) build && deploy;;
     build) build;;
+    help | "") usage;;
 esac
