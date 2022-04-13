@@ -38,9 +38,9 @@ build () {
 
     for template in $(fd . -e "$TMPL_EXT" -x echo {/}); do
         page_type=".${template%%$TMPL_EXT}.md" # p.template.html -> foo.p.md
-        for page in $(find . -type f -name "*$page_type"); do
+        for page in $(fd . -e "$page_type"); do
             echo "Building ${page%%$page_type}..."
-            INCLUDE_FILE=$page pp $template > ${page%%$page_type}.html
+            INCLUDE_FILE="$page" pp < "$template" > ${page%%$page_type}.html
         done
     done
 }
@@ -61,8 +61,13 @@ body{
 	background: #f1e7da;
 }
 h1,h2,h3{font-family: sans-serif;}
+a:visited{color:#333} /*Not working*/
 img{max-width:100%;}
 pre{overflow:auto;}
+
+nav ul {display: none; list-style: none; padding: 0}
+nav #checkbox {opacity: 0;outline: 1px solid}
+nav #checkbox:checked + ul {display: block}
 EOF
     cat > p.template.html << EOF
 <!DOCTYPE html>
@@ -76,22 +81,17 @@ EOF
     <link rel="stylesheet" type="text/css" href="/style.css">
 </head>
 <body>
-    <div class="pad2y" style=position:relative>
-        <div class="header-wrap header nu limiter">
-            <h1 style="line-height:1.6;font-size:1rem;margin:0 0 0.25em 0;">
-            <a href="/" style="">!{echo \$PPAGES_TITLE}!</a>
-            </h1>
-            <nav>
-                <label class= "label" for="checkbox">Menu ▼</label>
-                <input id="checkbox" type="checkbox" />
+<header style="display:flex;justify-content:space-between">
+    <h1 style="display:inline-block;font-size:1rem">
+    <a href="/">!{echo \$PPAGES_TITLE}!</a>
+    </h1>
+    <nav style="display:inline-block;-webkit-user-select:none">
+        <label style="padding: 5px;outline: 1px solid" for="checkbox">Menu ▼</label>
+        <input id="checkbox" type="checkbox" />
 !! [ ! -f nav.t.md ] || cmark nav.t.md
-            </nav>
-        </div>
-
-        <div class="pad2y limiter content">
+    </nav>
+</header>
 !! cat \$INCLUDE_FILE | pp | cmark --unsafe
-        </div>
-    </div>
 </body>
 </html>
 EOF
