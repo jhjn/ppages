@@ -4,14 +4,34 @@
 
 CONFIG="config"
 TMPL_EXT=".template.html"
+BOLD=$'\e[1m'
+RED=$'\e[31m'
+RESET=$'\e[0m'
 
 die () {
     echo "Error: $1" >&2
     exit 1
 }
 
+careful_cat () {
+    [ -f "$1" ] && echo "Skipping writing "$1" as it exists." >&2 || cat > "$1"
+}
+
 usage () {
-    echo "usage"
+    echo "Usage: ${0##*/} v0.1.0"
+    echo
+    echo "Commands:"
+    echo "    init) write example config and templates to PWD"
+    echo "   build) generate site by compiling the templates and markdown"
+    echo "  deploy) copy the site files to the configured remote"
+    echo "    help) display this help"
+    echo ""
+    echo "Template System:"
+    echo "  - Files named ${BOLD}*${RESET}.${RED}bar${RESET}.md are processed using ${RED}bar${RESET}.template.html"
+    echo "  - A file named ${BOLD}dir/foo${RESET}.${RED}bar${RESET}.md becomes ${BOLD}dir/foo${RESET}.html"
+    echo "  - Templates and markdown are customised with ${BOLD}pp${RESET} syntax, see pp(1)"
+    echo "  - See '${0##*/} init' for an example config and template setup"
+    echo "  - The example template pipes the ${RED}md${RESET} file through ${BOLD}pp${RESET} into ${BOLD}cmark${RESET}"
 }
 
 get_from_cfg () {
@@ -37,22 +57,24 @@ build () {
     export PPAGES_TITLE="$(get_from_cfg title)"
 
     for template in $(fd . -e "$TMPL_EXT" -x echo {/}); do
-        page_type=".${template%%$TMPL_EXT}.md" # p.template.html -> foo.p.md
-        for page in $(fd . -e "$page_type"); do
-            echo "Building ${page%%$page_type}..."
-            INCLUDE_FILE="$page" pp < "$template" > ${page%%$page_type}.html
+        page_type="${template%%$TMPL_EXT}"   # Here we have:
+        page_ext=".$page_type.md"            #   p.template.html -> foo.p.md
+        echo "Building template type '$page_type':"
+        for page in $(fd . -e "$page_ext"); do
+            echo " - processing ${page##./}"
+            INPUT_FILE="$page" pp < "$template" > ${page%%$page_ext}.html
         done
     done
 }
 
 init () {
-    cat > config << EOF
+    careful_cat config << EOF
 [example.com]
 author = Anon.
 title = My website
 remote = hostname:/var/www
 EOF
-    cat > style.css << EOF
+    careful_cat style.css << EOF
 body{
 	margin: 40px auto;
 	max-width: 650px;
@@ -60,44 +82,71 @@ body{
 	padding: 0 10px;
 	background: #f1e7da;
 }
-h1,h2,h3{font-family: sans-serif;}
-a:visited{color:#333} /*Not working*/
-img{max-width:100%;}
-pre{overflow:auto;}
+h1,h2,h3{font-family: sans-serif}
+a,a:visited{color:#555}
+img{max-width:100%}
+pre{overflow:auto}
 
-nav ul {display: none; list-style: none; padding: 0}
-nav #checkbox {opacity: 0;outline: 1px solid}
-nav #checkbox:checked + ul {display: block}
+nav ul{display: none; list-style: none; padding: 0}
+nav #checkbox{opacity: 0}
+nav #checkbox:checked + ul{display: block}
 EOF
-    cat > p.template.html << EOF
+    careful_cat p.template.html << EOF
+!!# Default 'Page' Template
+!!#=========================
+!!# See pp(1) for syntax: !!, !{...}!
+!!# See 'ppages help' for templating
 <!DOCTYPE html>
 <html lang=en>
 <head>
     <title>!{echo \$PPAGES_TITLE}!</title>
     <meta charset=utf-8>
-    <meta content="{echo \$PPAGES_AUTHOR}" name=author>
-    <meta name="viewport" content="width=device-width,initial-scale=1">
+    <meta name=author content="{echo \$PPAGES_AUTHOR}" name=author>
+    <meta name=viewport content="width=device-width,initial-scale=1">
     <link rel="shortcut icon" href="/favicon.svg"/>
     <link rel="stylesheet" type="text/css" href="/style.css">
 </head>
 <body>
+!!# The header is free to be customised with this as an example
 <header style="display:flex;justify-content:space-between">
-    <h1 style="display:inline-block;font-size:1rem">
+    <h1 style="display:inline-block;font-size:1rem;margin-top:0.25em">
     <a href="/">!{echo \$PPAGES_TITLE}!</a>
     </h1>
     <nav style="display:inline-block;-webkit-user-select:none">
         <label style="padding: 5px;outline: 1px solid" for="checkbox">Menu ▼</label>
         <input id="checkbox" type="checkbox" />
-!! [ ! -f nav.t.md ] || cmark nav.t.md
+!!# The nav bar is compiled from a file if it exists
+!! [ ! -f nav.md ] || cmark nav.md
     </nav>
 </header>
-!! cat \$INCLUDE_FILE | pp | cmark --unsafe
+!!# Below we are piping the found *.<type>.md file through pp then compiling
+!!# using commonmark (<type> is in this file's name as <type>.template.html)
+!! pp <\$INPUT_FILE | cmark --unsafe
 </body>
 </html>
 EOF
-    cat > index.p.md << EOF
+    careful_cat nav.md << EOF
+* [home](/)
+* [blog](/blog)
+* [research](/research)
+EOF
+    careful_cat index.p.md << EOF
 # Homepage
 Welcome to my site!
+
+Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud [exercitation](https://wikipedia.org) ullamco laboris nisi ut aliquip ex ea commodo consequat. Duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla pariatur.
+
+Excepteur sint occaecat cupidatat non proident, sunt in culpa qui officia deserunt mollit anim id est laborum.
+
+## Code works too
+Here is an important addition to an HTML head:
+\`\`\`
+<head>
+    ...
+    <meta name=viewport content="width=device-width,initial-scale=1">
+    ...
+</head>
+\`\`\`
 EOF
 }
 
