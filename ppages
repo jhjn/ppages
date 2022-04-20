@@ -73,8 +73,8 @@ init () {
 [example.com]
 author = Anon.
 title = My website
-# Defaults to pale-beige: Try pale-blue 'dee'
-background = fed
+# Defaults to pale-beige: Try pale-blue '#dee'
+background = #fed
 remote = hostname:/var/www
 EOF
     careful_cat style.css << EOF
@@ -109,7 +109,7 @@ EOF
     <link rel="shortcut icon" href="/favicon.svg"/>
     <link rel="stylesheet" type="text/css" href="/style.css">
 </head>
-<body style="background:#!{echo \$PPAGES_BG}!">
+<body style="background:!{echo \$PPAGES_BG}!">
 <header style="display:flex;justify-content:space-between">
     <h1 style="display:inline-block;font-size:1rem;margin-top:0.25em">
     <a href="/">!{echo \$PPAGES_TITLE}!</a>
@@ -125,6 +125,11 @@ EOF
 !!#   <type> in this file's name comes from <type>.template.html
 !! pandoc <\$INPUT_FILE
 </body>
+!!# Optional footer with link to the generator
+<footer style="margin: 4em auto; text-align:right">
+<hr>
+<p>built with <a href="https://github.com/jhjn/ppages">ppages</a></p>
+</footer>
 </html>
 EOF
     careful_cat nav.md << EOF
@@ -152,17 +157,17 @@ Here is an important addition to an HTML head:
 
 ## ...and tables too
 
--------------------------------------------------------------
+------------------------------------------------------------------------
  Centered   Default           Right Left
   Header    Aligned         Aligned Aligned
------------ ------- --------------- -------------------------
+----------- ------- --------------- ------------------------------------
    First    row                12.0 Example of a row that
                                     spans multiple lines.
 
   Second    row                 5.0 Here's another one. Note
                                     the blank line between
                                     rows.
--------------------------------------------------------------
+------------------------------------------------------------------------
 
 Table: Table 1: shows off markdown + styling
 EOF
